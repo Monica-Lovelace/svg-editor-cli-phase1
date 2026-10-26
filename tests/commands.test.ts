@@ -95,3 +95,47 @@ test('only successful document mutations clear history; save binds a default pat
   assert.deepEqual(await repl.evaluate('undo'), ['error: undo not allowed after io command']);
   await repl.evaluate('init'); assert.equal(session.path, undefined);
 });
+
+test('every shape geometry whitelist updates, scales and restores exact numeric values', async () => {
+  const session = new EditorSession(new MemoryDocumentStore()); const repl = new Repl(session);
+  await repl.evaluate('init');
+  const cases: [string, string, string[]][] = [
+    ['rect','1 2 3 4',['x','y','width','height']], ['circle','1 2 3',['cx','cy','r']],
+    ['ellipse','1 2 3 4',['cx','cy','rx','ry']], ['line','1 2 3 4',['x1','y1','x2','y2']], ['text','1 2 "text"',['x','y']],
+  ];
+  for (const [type, args, attributes] of cases) {
+    await repl.evaluate(`create ${type} ${type} ${args}`);
+    for (const name of attributes) {
+      await repl.evaluate(`set ${type} ${name} 0.1`);
+      assert.equal(session.document.find(type).attributes[name], '0.1');
+    }
+    for (const [name, value] of [['fill','red'],['stroke','blue'],['stroke-width','1.5']]) {
+      await repl.evaluate(`set ${type} ${name} ${value}`); assert.equal(session.document.find(type).attributes[name!], value);
+    }
+    await repl.evaluate(`scale ${type} 3`); await repl.evaluate('undo');
+    for (const name of attributes) assert.equal(session.document.find(type).attributes[name], '0.1');
+  }
+  await repl.evaluate('create g g'); await repl.evaluate('set g fill red');
+  assert.equal(session.document.find('g').attributes.fill, 'red');
+  assert.match((await repl.evaluate('set g x 1'))[0]!, /unknown attribute: x/);
+  assert.match((await repl.evaluate('set text label x'))[0]!, /unknown attribute: label/);
+});
+
+test('repeated structural edits undo to each prior tree and redo to the same result', async () => {
+  const session = new EditorSession(new MemoryDocumentStore()); const repl = new Repl(session); const renderer = new TreeRenderer();
+  for (const command of ['init','create g scene','create g left in scene','create g right in scene','create rect a 0 0 1 1 in left','create rect b 2 2 1 1 in right','create circle c 4 4 1 in right']) await repl.evaluate(command);
+  const snapshots = [renderer.render(session.document)];
+  const sequence = ['group pair b a','addto pair c','move pair 0.1 -0.2','scale scene 1.1','set pair fill blue','front left','back pair','ungroup pair','delete right','group newPair c b','delete newPair'];
+  for (const command of sequence) {
+    assert.ok(!(await repl.evaluate(command))[0]!.startsWith('error:'), command);
+    session.document.assertValid(); snapshots.push(renderer.render(session.document));
+  }
+  for (let index = sequence.length - 1; index >= 0; index--) {
+    await repl.evaluate('undo'); assert.equal(renderer.render(session.document), snapshots[index]);
+    session.document.assertValid();
+  }
+  for (let index = 1; index <= sequence.length; index++) {
+    await repl.evaluate('redo'); assert.equal(renderer.render(session.document), snapshots[index]);
+    session.document.assertValid();
+  }
+});

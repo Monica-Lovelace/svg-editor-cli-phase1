@@ -78,8 +78,15 @@ test('unsupported SVG is rejected explicitly instead of silently discarded', () 
     '<svg><path id="p" d="M 0 0"/></svg>', '<svg><text id="t"><tspan>Hi</tspan></text></svg>',
     '<svg><g id="g" transform="rotate(30)"/></svg>', '<svg><g id="g" transform="scale(2,3)"/></svg>',
     '<svg><rect id="r" style="fill:red"/></svg>', '<svg viewBox="0 0 100 100" width="200" height="200"/>',
-    '<svg xmlns="urn:other"/>', '<svg><circle id="c" r="-1"/></svg>',
+    '<svg xmlns="urn:other"/>', '<svg><circle id="c" r="-1"/></svg>', '<svg>unexpected</svg>',
   ]) assert.throws(() => reader.parse(source), /./, source);
+});
+
+test('flattened transform also scales inherited dash lengths while retaining paint inheritance', () => {
+  const doc = new SvgReader().parse('<svg><g id="g" transform="scale(2)" fill="red" stroke-dasharray="2, 3"><line id="l" stroke="black" x2="10"/></g></svg>').document;
+  assert.equal(doc.find('l').attributes['stroke-dasharray'], '4 6');
+  assert.equal(doc.find('l').attributes.fill, undefined);
+  assert.equal(doc.find('g').attributes.fill, 'red');
 });
 
 test('real file errors and malformed imports leave session, redo and path unchanged', async () => {

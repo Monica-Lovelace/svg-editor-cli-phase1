@@ -1,0 +1,26 @@
+@startuml
+title SVG Editor CLI — Module Dependencies
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName SansSerif
+skinparam packageStyle rectangle
+skinparam backgroundColor white
+skinparam ArrowColor #334155
+skinparam packageBackgroundColor #F1F5F9
+skinparam packageBorderColor #64748B
+
+package "main.ts\nComposition root" as Main
+package "cli\nRepl / Tokenizer / CommandDispatcher\nTreeRenderer / ShapeInspector\nPresentation commands" as CLI
+package "application\nEditorSession / HistoryManager\nCommand / UndoableCommand\nDocumentStore interface (port)" as App
+package "domain\nSvgDocument / ShapeFactory / Memento\nShape / GeometryShape / Group\nRect / Circle / Ellipse / Line / Text" as Domain
+package "infrastructure\nNodeDocumentStore\nSvgReader / SvgWriter\nXmlElement / SvgTransform" as Infra
+
+Main --> CLI
+Main --> App
+Main --> Infra
+CLI --> App
+CLI --> Domain
+App --> Domain
+Infra --> App : implements port
+Infra --> Domain
+@enduml

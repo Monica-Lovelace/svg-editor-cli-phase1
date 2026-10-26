@@ -18,6 +18,7 @@ export class SvgReader {
     const roots = (parser.parse(source) as OrderedNode[]).map(raw => new XmlElement(raw)).filter(element => !element.name.startsWith('#') && !element.name.startsWith('?'));
     if (roots.length !== 1 || roots[0]!.name !== 'svg') throw new EditorError('expected one <svg> root');
     const root = roots[0]!;
+    if (root.content.trim()) throw new EditorError('unexpected text inside <svg>');
     const attributes = root.attributes;
     if (attributes.xmlns !== undefined && attributes.xmlns !== 'http://www.w3.org/2000/svg') throw new EditorError('unsupported SVG namespace');
     const width = Numeric.positive(Numeric.parse((attributes.width ?? '800').replace(/px$/, ''), 'canvas width'), 'canvas width');
@@ -78,6 +79,11 @@ export class SvgReader {
       if (transform.factor !== 1) {
         const stroke = Numeric.nonnegative(Numeric.parse((effective['stroke-width'] ?? '1').replace(/px$/, ''), 'stroke-width'), 'stroke-width');
         shape.setAttribute('stroke-width', String(stroke * transform.factor));
+        const dash = effective['stroke-dasharray'];
+        if (dash && dash !== 'none') {
+          const values = dash.trim().split(/[\s,]+/).map(value => Numeric.nonnegative(Numeric.parse(value.replace(/px$/, ''), 'stroke-dasharray'), 'stroke-dasharray'));
+          shape.importPresentation({ 'stroke-dasharray': values.map(value => Numeric.finite(value * transform.factor, 'stroke-dasharray')).join(' ') });
+        }
         if (shape.textContent !== undefined) {
           const size = Numeric.nonnegative(Numeric.parse((effective['font-size'] ?? '16').replace(/px$/, ''), 'font-size'), 'font-size');
           shape.importPresentation({ 'font-size': String(Numeric.finite(size * transform.factor, 'font-size')) });
