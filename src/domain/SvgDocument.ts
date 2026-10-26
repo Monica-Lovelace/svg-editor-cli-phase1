@@ -6,19 +6,22 @@ import { Numeric } from './Numeric.js';
 export class SvgDocument {
   #width: number;
   #height: number;
+  readonly #presentation: Record<string, string>;
   readonly #root = new Group('__internal_canvas__');
   #index = new Map<string, Shape>();
   #parents = new Map<Shape, Group>();
 
-  constructor(width = 800, height = 600) {
+  constructor(width = 800, height = 600, presentation: Readonly<Record<string, string>> = {}) {
     this.#width = Numeric.positive(width, 'canvas width');
     this.#height = Numeric.positive(height, 'canvas height');
+    this.#presentation = { ...presentation };
   }
 
   get width(): number { return this.#width; }
   get height(): number { return this.#height; }
   get children(): readonly Shape[] { return this.#root.children; }
   get count(): number { return this.#index.size; }
+  get presentation(): Readonly<Record<string, string>> { return Object.freeze({ ...this.#presentation }); }
 
   resize(width: number, height: number): void {
     Numeric.positive(width, 'canvas width'); Numeric.positive(height, 'canvas height');
@@ -109,7 +112,7 @@ export class SvgDocument {
   }
 
   clone(): SvgDocument {
-    const result = new SvgDocument(this.width, this.height);
+    const result = new SvgDocument(this.width, this.height, this.#presentation);
     for (const shape of this.children) result.#root.insert(shape.clone());
     result.assertValid(); return result;
   }
